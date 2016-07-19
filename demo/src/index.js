@@ -3,12 +3,16 @@ import React from 'react'
 import ReactDOM from 'react-dom'
 // These imports are aliased to ~/src, so you are welcome to mess with
 // the source code :)
-import reformed from 'react-reformed'
-import compose from 'react-reformed/lib/compose'
-import syncWith from 'react-reformed/lib/syncWith'
-import validateSchema from 'react-reformed/lib/validateSchema'
+import reformed from '../../src/reformed'
+import compose from '../../src/compose'
+import syncWith from '../../src/syncWith'
+import validateSchema from '../../src/validateSchema'
 
 const contains = (x, xs) => xs && !!~xs.indexOf(x)
+const isNode = () => (
+  typeof process === 'object' &&
+  process + '' === '[object process]'
+)
 
 /*
  * Here you can create your base form component.
@@ -93,13 +97,7 @@ const createFormContainer = compose(
         }
       }
     }
-  }),
-  // And while we're at it, we can make our form sync to local storage.
-  syncWith(
-    'myForm',
-    (key) => JSON.parse(localStorage.getItem(key)),
-    (key, value) => localStorage.setItem(key, JSON.stringify(value))
-  ),
+  })
 )
 
 /**
@@ -158,7 +156,7 @@ class App extends React.Component {
             </p>
             <MyFormContainer
               onSubmit={this._onSubmit}
-              initialModel={{ checkboxes: [] }}
+              initialModel={this.props.initialModel}
             />
           </div>
         </div>
@@ -167,4 +165,13 @@ class App extends React.Component {
   }
 }
 
-ReactDOM.render(<App />, window.root)
+if (!isNode()) {
+  ReactDOM.render(
+    <App
+      initialModel={window.__INITIAL_STATE__.form.model}
+    />,
+    window.root
+  )
+}
+
+export default App
