@@ -18,56 +18,100 @@ const isNode = () => (
  * Here you can create your base form component.
  * Look at how small and sleek it is.
  */
-const MyForm = ({ bindInput, bindToChangeEvent, model, onSubmit, setProperty, schema }) => {
-  const sampleCheckboxOptions = ['foo', 'bar', 'baz']
-  const submitHandler = (e) => {
-    e.preventDefault()
-    onSubmit(model)
-  }
-  const isUsernameValid = schema.fields.username.isValid
-  const isPasswordValid = schema.fields.password.isValid
+class MyForm extends React.Component {
+  render () {
+    const { bindInput, bindToChangeEvent, model, onSubmit, setProperty, _schema } = this.props
+    const sampleCheckboxOptions = ['foo', 'bar', 'baz']
+    const submitHandler = (e) => {
+      e.preventDefault()
+      onSubmit(model)
+    }
+    const schema = {
+      isValid: false,
+      fields: {
+        username: { isValid: false },
+        password: { isValid: false },
+      }
+    }
+    const isUsernameValid = schema.fields.username.isValid
+    const isPasswordValid = schema.fields.password.isValid
 
-  return (
-    <form onSubmit={submitHandler}>
-      <fieldset className={cx('form-group', { 'has-danger': !isUsernameValid })}>
-        <label htmlFor='username'>Username</label>
-        <input
-          type='text'
-          className='form-control'
-          placeholder='Username'
-          {...bindInput('username')}
-        />
-      </fieldset>
-      <fieldset className={cx('form-group', { 'has-danger': !isPasswordValid })}>
-        <label htmlFor='password'>Password</label>
-        <input
-          type='text'
-          className='form-control'
-          placeholder='Password'
-          {...bindInput('password')}
-        />
-      </fieldset>
-      <fieldset className='form-group'>
-        {sampleCheckboxOptions.map(value => (
-          <div key={value} className='checkbox-inline'>
-            <label>
-              <input
-                type='checkbox'
-                name='checkboxes'
-                value={value}
-                checked={contains(value, model.checkboxes)}
-                onChange={bindToChangeEvent}
-              />
-              {' '}{value}
-            </label>
-          </div>
-        ))}
-      </fieldset>
-      <button type='submit' className='btn btn-primary' disabled={!schema.isValid}>
-        View Source Code
-      </button>
-    </form>
-  )
+    return (
+      <form onSubmit={submitHandler}>
+        <fieldset className={cx('form-group', { 'has-danger': !isUsernameValid })}>
+          <label htmlFor='username'>Username</label>
+          <input
+            type='text'
+            className='form-control'
+            placeholder='Username'
+            {...bindInput('username')}
+          />
+        </fieldset>
+        <fieldset className={cx('form-group', { 'has-danger': !isPasswordValid })}>
+          <label htmlFor='password'>Password</label>
+          <input
+            type='text'
+            className='form-control'
+            placeholder='Password'
+            {...bindInput('password')}
+          />
+        </fieldset>
+        <fieldset className='form-group'>
+          {sampleCheckboxOptions.map(value => (
+            <div key={value} className='checkbox-inline'>
+              <label>
+                <input
+                  type='checkbox'
+                  name='checkboxes'
+                  value={value}
+                  checked={contains(value, model.checkboxes)}
+                  onChange={bindToChangeEvent}
+                />
+                {' '}{value}
+              </label>
+            </div>
+          ))}
+        </fieldset>
+        <button type='submit' className='btn btn-primary' disabled={!schema.isValid}>
+          View Source Code
+        </button>
+      </form>
+    )
+  }
+}
+
+const rehydrateFromDOM = (WrappedComponent) => {
+  class RehydratableFromDOM extends React.Component {
+    componentDidMount () {
+      const form = ReactDOM.findDOMNode(this._form)
+      const model = [...form.querySelectorAll('input')]
+        .reduce((acc, input) => {
+          switch (input.type) {
+            case 'checkbox':
+              if (input.checked) {
+                acc[input.name] = (acc[input.name] || []).concat(input.value)
+              }
+              break
+            default:
+              acc[input.name] = input.value
+          }
+          return acc
+        }, {})
+      this.props.setModel(model)
+    }
+s
+    _onRef = (el) => {
+      this._form = el
+    }
+
+    render () {
+      return React.createElement(WrappedComponent, {
+        ...this.props,
+        ref: this._onRef,
+      })
+    }
+  }
+  return RehydratableFromDOM
 }
 
 /*
@@ -80,24 +124,25 @@ const MyForm = ({ bindInput, bindToChangeEvent, model, onSubmit, setProperty, sc
  */
 const createFormContainer = compose(
   reformed(),
+  rehydrateFromDOM,
   // Let's try out some schema validation...
-  validateSchema({
-    username: {
-      required: true,
-      maxLength: 8,
-    },
-    password: {
-      // note: my `test` implementation is super basic, `fail` can
-      // only be used synchronously. Write your own to suit your needs!
-      test: (value, fail) => {
-        if (!value || value.length < 5) {
-          return fail('Password must be at least 5 characters')
-        } else if (value.length > 12) {
-          return fail('Password must be no longer than 12 characters')
-        }
-      }
-    }
-  })
+  // validateSchema({
+  //   username: {
+  //     required: true,
+  //     maxLength: 8,
+  //   },
+  //   password: {
+  //     // note: my `test` implementation is super basic, `fail` can
+  //     // only be used synchronously. Write your own to suit your needs!
+  //     test: (value, fail) => {
+  //       if (!value || value.length < 5) {
+  //         return fail('Password must be at least 5 characters')
+  //       } else if (value.length > 12) {
+  //         return fail('Password must be no longer than 12 characters')
+  //       }
+  //     }
+  //   }
+  // })
 )
 
 /**
@@ -106,18 +151,20 @@ const createFormContainer = compose(
  * generic HoC to display our form state below it.
  */
 const displayFormState = (WrappedComponent) => {
-  return (props) => {
-    return (
-      <div>
-        {React.createElement(WrappedComponent, props)}
-        <hr />
-        <h4>Model</h4>
-        <pre>{JSON.stringify(props.model, null, 2)}</pre>
-        <hr />
-        <h4>Schema Validation</h4>
-        <pre>{JSON.stringify(props.schema, null, 2)}</pre>
-      </div>
-    )
+  return class DisplayFormState extends React.Component {
+    render () {
+      return (
+        <div>
+          {React.createElement(WrappedComponent, this.props)}
+          <hr />
+          <h4>Model</h4>
+          <pre>{JSON.stringify(this.props.model, null, 2)}</pre>
+          <hr />
+          <h4>Schema Validation</h4>
+          <pre>{JSON.stringify(this.props.schema, null, 2)}</pre>
+        </div>
+      )
+    }
   }
 }
 
@@ -166,12 +213,14 @@ class App extends React.Component {
 }
 
 if (!isNode()) {
-  ReactDOM.render(
-    <App
-      initialModel={window.__INITIAL_STATE__.form.model}
-    />,
-    window.root
-  )
+  window.render = () => {
+    ReactDOM.render(
+      <App
+        initialModel={window.__INITIAL_STATE__.form.model}
+      />,
+      window.root
+    )
+  }
 }
 
 export default App
